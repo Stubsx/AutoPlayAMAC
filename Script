@@ -1,0 +1,117 @@
+// ==UserScript==
+// @name         基金从业人员远程培训工具
+// @namespace    stubsx
+// @version      0.8
+// @description  Prevent the video from stopping when losing focus
+// @author       stubsx
+// @match        https://peixun.amac.org.cn/*
+// @icon         https://peixun.amac.org.cn/favicon.ico
+// @grant        none
+// @license      MIT
+// ==/UserScript==
+(function() {
+    'use strict';
+
+    let videoElement = null;
+    let originalPause = null;
+    let originalPlay = null;
+
+    function findVideoElement() {
+        videoElement = document.querySelector('video');
+        if (videoElement) {
+            console.log('找到视频元素:', videoElement);
+            return true;
+        }
+        console.log('未找到视频元素，将继续尝试');
+        return false;
+    }
+
+    function overrideMethods() {
+        if (!videoElement) return;
+
+        originalPause = videoElement.pause;
+        originalPlay = videoElement.play;
+
+        videoElement.pause = function() {
+            console.log('暂停方法被调用，但已被阻止');
+            // 不执行实际的暂停操作
+        };
+
+        videoElement.play = function() {
+            console.log('播放方法被调用');
+            try {
+                const playPromise = originalPlay.call(this);
+                if (playPromise !== undefined) {
+                    return playPromise.catch(e => console.log('播放出错:', e));
+                }
+            } catch (e) {
+                console.log('调用原始播放方法时出错:', e);
+            }
+        };
+
+        console.log('视频方法已被覆盖');
+    }
+
+    function checkVideoStatus() {
+        if (!videoElement) {
+            console.log('视频元素不存在，重新查找');
+            findVideoElement();
+            if (videoElement) overrideMethods();
+            return;
+        }
+
+        console.log('检查视频状态: 暂停 =', videoElement.paused);
+        if (videoElement.paused) {
+            console.log('检测到视频已暂停，正在尝试恢复播放');
+            try {
+                const playPromise = videoElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => console.log('无法恢复播放:', e));
+                }
+            } catch (e) {
+                console.log('尝试恢复播放时出错:', e);
+            }
+        }
+    }
+
+    function initPreventPause() {
+        if (findVideoElement()) {
+            overrideMethods();
+            setInterval(checkVideoStatus, 1000); // 每秒检查一次视频状态
+            console.log('防止视频暂停的功能已启用');
+        } else {
+            setTimeout(initPreventPause, 1000); // 如果没找到视频元素，1秒后再试
+        }
+    }
+
+    // 在页面加载完成后执行
+    window.addEventListener('load', initPreventPause);
+
+    // 添加一个按钮，允许用户手动触发功能
+    const button = document.createElement('button');
+    button.textContent = '防止视频暂停';
+    button.style.position = 'fixed';
+    button.style.top = '10px';
+    button.style.right = '10px';
+    button.style.zIndex = '9999';
+    button.addEventListener('click', initPreventPause);
+    document.body.appendChild(button);
+
+    // 添加一个恢复原始功能的按钮
+    const restoreButton = document.createElement('button');
+    restoreButton.textContent = '恢复原始功能';
+    restoreButton.style.position = 'fixed';
+    restoreButton.style.top = '40px';
+    restoreButton.style.right = '10px';
+    restoreButton.style.zIndex = '9999';
+    restoreButton.addEventListener('click', function() {
+        if (videoElement && originalPause && originalPlay) {
+            videoElement.pause = originalPause;
+            videoElement.play = originalPlay;
+            console.log('已恢复视频原始功能');
+        } else {
+            console.log('无法恢复原始功能，视频元素或原始方法不存在');
+        }
+    });
+    document.body.appendChild(restoreButton);
+})();
